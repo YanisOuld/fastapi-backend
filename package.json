@@ -1,0 +1,16 @@
+{
+  "name": "fastapi-template",
+  "private": true,
+  "description": "npm script aliases mirroring the Makefile, for environments without `make` (e.g. native Windows)",
+  "scripts": {
+    "dev": "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "start": "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000",
+    "test": "uv run pytest tests/ -v",
+    "lint": "uv run ruff check . && uv run ruff format --check .",
+    "format": "uv run ruff check --fix . && uv run ruff format .",
+    "migrate": "uv run alembic upgrade head",
+    "migration": "uv run alembic revision --autogenerate -m",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  }
+}
