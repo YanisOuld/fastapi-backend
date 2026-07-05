@@ -6,15 +6,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.constant import DEFAULT_PAGE_SIZE
 from app.core.exceptions import NotFoundException
 from app.models.base import AppModel
+from app.schemas.base import AppSchema
 
 
-class BaseService[ModelT: AppModel]:
+class BaseService[ModelT: AppModel, UpdateModelT: AppSchema]:
     """
     Generic CRUD service. Extend it and set `model` to get
-    get_by_id / get_all / create / delete for free.
+    get_by_id / get_all / create / update / delete for free.
+
+    Write methods only flush(); they never commit. The request-level
+    transaction is committed (or rolled back) once in `get_db`, so multiple
+    service calls within one request are atomic.
 
     Example:
-        class UserService(BaseService[User]):
+        class UserService(BaseService[User, UserUpdate]):
             model = User
 
         service = UserService(db)
@@ -43,11 +48,17 @@ class BaseService[ModelT: AppModel]:
 
     async def create(self, instance: ModelT) -> ModelT:
         self.db.add(instance)
-        await self.db.commit()
-        await self.db.refresh(instance)
+        await self.db.flush()
+        return instance
+
+    async def update(self, id: uuid.UUID, data: UpdateModelT) -> ModelT:
+        instance = await self.get_by_id(id)
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(instance, field, value)
+        await self.db.flush()
         return instance
 
     async def delete(self, id: uuid.UUID) -> None:
         instance = await self.get_by_id(id)
         await self.db.delete(instance)
-        await self.db.commit()
+        await self.db.flush()
