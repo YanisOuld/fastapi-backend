@@ -1,80 +1,123 @@
 # FastAPI Template
 
-Template de base pour un backend FastAPI : auth JWT, PostgreSQL (SQLAlchemy async), Redis, migrations Alembic, tests, CI.
+Base template for a FastAPI backend: JWT auth, PostgreSQL (async SQLAlchemy), Redis, Alembic migrations, tests, CI.
 
-## Démarrage rapide
+## Requirements
+
+- Python 3.12+ (see [.python-version](.python-version))
+- [uv](https://docs.astral.sh/uv/) — dependency management
+- Docker (with the Compose plugin) — runs PostgreSQL and Redis locally
+- `make` (optional — every command has an npm equivalent for native Windows)
+
+## Quick start
 
 ```bash
-cp .env.example .env          # ajuster SECRET_KEY en prod
-make docker-up                 # postgres + redis (docker-compose.yml)
-uv sync --all-groups
-make migrate                   # applique les migrations
-make dev                       # lance le serveur avec reload
+cp .env.example .env          # set a real SECRET_KEY for production
+make docker-up                 # starts postgres + redis (docker-compose.yml)
+uv sync --all-groups           # install dependencies
+make migrate                   # apply database migrations
+make dev                       # start the server with auto-reload
 ```
 
-Équivalent npm si `make` n'est pas dispo (Windows natif) : `npm run docker:up`, `npm run migrate`, `npm run dev`.
+If `make` is not available (native Windows), use the npm equivalents: `npm run docker:up`, `npm run migrate`, `npm run dev`.
 
-Docs interactives : http://localhost:8000/docs (visible seulement si `DEBUG=true`).
+Interactive API docs: http://localhost:8000/docs (only exposed when `DEBUG=true`).
 
-## Structure
+## Running the server
+
+The app runs locally with uvicorn; Docker is only used for the infrastructure (see next section).
+
+| Mode | Command | Notes |
+|---|---|---|
+| Development | `make dev` / `npm run dev` | auto-reload on file changes |
+| Production-like | `make run` / `npm run start` | no reload |
+
+Both serve on `0.0.0.0:8000`. Under the hood they run:
+
+```bash
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 [--reload]
+```
+
+Before the first run, make sure:
+
+1. `.env` exists (`cp .env.example .env`) — settings are loaded from it at startup.
+2. Postgres and Redis are up (`make docker-up`).
+3. Migrations are applied (`make migrate`).
+
+## Docker
+
+[docker-compose.yml](docker-compose.yml) provides the two services the app depends on — it does **not** containerize the app itself:
+
+- **postgres** (`postgres:16-alpine`) on `localhost:5432` — user `user`, password `password`, database `dbname` (matches the default `DATABASE_URL` in `.env.example`)
+- **redis** (`redis:7-alpine`) on `localhost:6379`
+
+```bash
+make docker-up      # docker compose up -d   (npm run docker:up)
+make docker-down    # docker compose down    (npm run docker:down)
+```
+
+Postgres data persists in the `postgres_data` volume across restarts. Both services have healthchecks; give them a few seconds after `docker-up` before running migrations.
+
+## Project structure
 
 ```
 app/
-  main.py              point d'entrée unique — instancie FastAPI, branche middlewares/exceptions/routers
+  main.py              single entry point — creates the FastAPI app, wires middlewares/exceptions/routers
   core/
-    config.py          Settings (pydantic-settings), chargé depuis .env
-    db.py               engine + session SQLAlchemy async
-    redis.py            client Redis async
-    security.py          hash de mot de passe (bcrypt) + JWT encode/decode
-    auth.py              dépendance get_current_user_id (vérifie le JWT, ou bypass si BYPASS_AUTH=true)
-    exceptions.py         AppException et sous-classes + handlers globaux
+    config.py          Settings (pydantic-settings), loaded from .env
+    db.py               async SQLAlchemy engine + session
+    redis.py            async Redis client
+    security.py          password hashing (bcrypt) + JWT encode/decode
+    auth.py              get_current_user_id dependency (verifies the JWT, or bypasses it if BYPASS_AUTH=true)
+    exceptions.py         AppException and subclasses + global handlers
     logging.py            setup_logging() / get_logger()
-    constant.py            constantes globales (pagination, etc.)
+    constant.py            global constants (pagination, etc.)
   models/
-    base.py               Base SQLAlchemy + AppModel (id UUID + created_at/updated_at)
+    base.py               SQLAlchemy Base + AppModel (UUID id + created_at/updated_at)
   schemas/
-    base.py                AppSchema — base Pydantic obligatoire pour tout schema du projet
-    pagination.py           Page[T] générique pour les réponses paginées
+    base.py                AppSchema — mandatory Pydantic base for every schema in the project
+    pagination.py           generic Page[T] for paginated responses
   services/
-    base.py                 BaseService[Model] — CRUD générique (get_by_id, get_all, create, delete)
+    base.py                 BaseService[Model] — generic CRUD (get_by_id, get_all, create, delete)
   api/
-    router.py                api_router central, agrège tous les sous-routers
-    dependancies.py           DbSession, CurrentUserId, RedisClient — dépendances typées Annotated
-    routes/                   un fichier par feature (health.py, info.py, ...)
-    schemas/                  schemas de requête/réponse par route, héritent de AppSchema
+    router.py                central api_router, aggregates all sub-routers
+    dependancies.py           DbSession, CurrentUserId, RedisClient — typed Annotated dependencies
+    routes/                   one file per feature (health.py, info.py, ...)
+    schemas/                  request/response schemas per route, inherit from AppSchema
   middlewares/
-    cors.py                   CORS (origins libres en DEBUG, ALLOWED_ORIGINS sinon)
-    request_id.py              header X-Request-ID sur chaque requête
-    logging.py                  log méthode/path/status/durée par requête
-alembic/                       migrations (async, configuré pour lire DATABASE_URL depuis Settings)
-scripts/                       scripts standalone (seed, maintenance) — pattern dans seed_db.py
-tests/                         conftest.py fournit un client HTTP avec DB/Redis mockés
+    cors.py                   CORS (open origins in DEBUG, ALLOWED_ORIGINS otherwise)
+    request_id.py              X-Request-ID header on every request
+    logging.py                  logs method/path/status/duration per request
+alembic/                       migrations (async, reads DATABASE_URL from Settings)
+scripts/                       standalone scripts (seed, maintenance) — pattern in seed_db.py
+tests/                         conftest.py provides an HTTP client with mocked DB/Redis
 ```
 
-## Conventions à respecter
+## Conventions
 
-- **Schemas** : toujours hériter de `AppSchema` ([app/schemas/base.py](app/schemas/base.py)), jamais `pydantic.BaseModel` directement.
-- **Schemas de route** vivent dans `app/api/schemas/`, co-localisés avec leur route. Les schemas génériques réutilisables (ex: `Page`) vivent dans `app/schemas/`.
-- **Logique métier** dans des services héritant de `BaseService[Model]`, pas dans les routes.
-- **Exceptions métier** : lever une sous-classe d'`AppException` (`NotFoundException`, `ConflictException`, etc.) plutôt qu'`HTTPException` directement.
-- **Dépendances de route** : utiliser les alias typés de `app/api/dependancies.py` (`DbSession`, `CurrentUserId`, `RedisClient`) plutôt que `Depends(...)` brut.
+- **Schemas**: always inherit from `AppSchema` ([app/schemas/base.py](app/schemas/base.py)), never from `pydantic.BaseModel` directly.
+- **Route schemas** live in `app/api/schemas/`, co-located with their route. Reusable generic schemas (e.g. `Page`) live in `app/schemas/`.
+- **Business logic** goes in services inheriting from `BaseService[Model]`, not in routes.
+- **Business exceptions**: raise a subclass of `AppException` (`NotFoundException`, `ConflictException`, etc.) rather than `HTTPException` directly.
+- **Route dependencies**: use the typed aliases from `app/api/dependancies.py` (`DbSession`, `CurrentUserId`, `RedisClient`) instead of raw `Depends(...)`.
 
-## Auth — mode bypass
+## Auth — bypass mode
 
-`BYPASS_AUTH=true` (valeur par défaut en dev) désactive complètement la vérification JWT — chaque requête est traitée comme authentifiée avec un user id fixe. **Le démarrage de l'app échoue volontairement si `BYPASS_AUTH=true` et `DEBUG=false`** ([app/core/config.py](app/core/config.py)), pour empêcher un oubli en production.
+`BYPASS_AUTH=true` (the default in dev) disables JWT verification entirely — every request is treated as authenticated with a fixed user id. **The app deliberately refuses to start if `BYPASS_AUTH=true` while `DEBUG=false`** ([app/core/config.py](app/core/config.py)), to prevent this from slipping into production.
 
-## Commandes utiles
+## Useful commands
 
 | Make | npm | Description |
 |---|---|---|
-| `make dev` | `npm run dev` | serveur avec reload |
-| `make test` | `npm run test` | suite de tests |
+| `make dev` | `npm run dev` | server with auto-reload |
+| `make run` | `npm run start` | server without reload |
+| `make test` | `npm run test` | test suite |
 | `make lint` | `npm run lint` | ruff check + format check |
-| `make format` | `npm run format` | corrige automatiquement |
-| `make migration name="..."` | `npm run migration -- "..."` | génère une migration Alembic |
-| `make migrate` | `npm run migrate` | applique les migrations |
-| `make docker-up` / `docker-down` | `npm run docker:up` / `docker:down` | postgres + redis locaux |
+| `make format` | `npm run format` | auto-fix lint and formatting |
+| `make migration name="..."` | `npm run migration -- "..."` | generate an Alembic migration |
+| `make migrate` | `npm run migrate` | apply migrations |
+| `make docker-up` / `docker-down` | `npm run docker:up` / `docker:down` | local postgres + redis |
 
 ## CI
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) : lint (ruff) puis tests (avec postgres/redis éphémères), sur chaque push/PR vers `main`.
+[.github/workflows/ci.yml](.github/workflows/ci.yml): lint (ruff) then tests (with ephemeral postgres/redis), on every push/PR to `main`.

@@ -9,9 +9,16 @@ from app.core.db import AsyncSessionLocal
 from app.core.redis import get_redis
 
 
+# Session-per-request unit of work: services only flush(), the whole request
+# is one transaction, committed here on success and rolled back on error.
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 # Typed shortcuts — use these as route dependencies instead of raw Depends()

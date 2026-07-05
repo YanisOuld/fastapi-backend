@@ -27,3 +27,7 @@ class UUIDMixin:
 
 class AppModel(UUIDMixin, TimestampMixin, Base):
     __abstract__ = True
+
+    # Fetch server-generated values (created_at/updated_at) via RETURNING at
+    # flush time, so no refresh() is needed before the transaction commits.
+    __mapper_args__ = {"eager_defaults": True}
