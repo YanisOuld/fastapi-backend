@@ -1,18 +1,22 @@
 from datetime import UTC, datetime, timedelta
 
+import bcrypt
 import jwt
 from backend.app.core.config import settings
-from passlib.context import CryptContext
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt hashes at most the first 72 bytes of a password and (since 5.x) raises
+# on anything longer, so we truncate to that boundary before hashing/verifying.
+_BCRYPT_MAX_BYTES = 72
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    pw = password.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+    return bcrypt.hashpw(pw, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    pw = plain.encode("utf-8")[:_BCRYPT_MAX_BYTES]
+    return bcrypt.checkpw(pw, hashed.encode("utf-8"))
 
 
 def create_access_token(subject: str | int, expires_delta: timedelta | None = None) -> str:
