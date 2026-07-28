@@ -1,8 +1,12 @@
 import asyncio
+import sys
 from logging.config import fileConfig
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from backend.app.core.config import settings
-from backend.app.models.base import Base
+from backend.app.models import Base
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
