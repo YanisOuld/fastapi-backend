@@ -1,6 +1,6 @@
 import uuid
 
-from backend.app.api.dependancies import CurrentUserId, DbSession
+from backend.app.api.dependencies import CurrentUserId, DbSession
 from backend.app.api.schemas.auth import LoginRequest, TokenResponse
 from backend.app.api.schemas.user import UserRead
 from backend.app.core.security import create_access_token

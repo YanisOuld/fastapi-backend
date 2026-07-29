@@ -1,6 +1,6 @@
 import uuid
 
-from backend.app.api.dependancies import DbSession
+from backend.app.api.dependencies import DbSession
 from backend.app.api.schemas.user import UserCreate, UserRead, UserUpdate
 from backend.app.core.constant import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from backend.app.schemas.pagination import Page

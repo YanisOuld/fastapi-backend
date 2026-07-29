@@ -1,4 +1,4 @@
-from backend.app.api.dependancies import DbSession, RedisClient
+from backend.app.api.dependencies import DbSession, RedisClient
 from backend.app.api.schemas.health import HealthChecks, HealthResponse
 from fastapi import APIRouter, status
 from sqlalchemy import text
