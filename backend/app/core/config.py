@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # CORS — liste d'origins autorisées en prod (ex: ["https://myapp.com"])
-    ALLOWED_ORIGINS: list[str] = ["https://localhost:8000"]
+    ALLOWED_ORIGINS: list[str] = ["http://localhost:8000"]
 
     # Security
     SECRET_KEY: str = "change-me-in-production-use-openssl-rand-hex-32"
