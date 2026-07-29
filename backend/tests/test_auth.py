@@ -1,13 +1,18 @@
 import pytest
 from backend.app.core.config import settings
+from backend.app.core.security import create_access_token
 from httpx import AsyncClient
 
 USERS = "/api/v1/users"
 AUTH = "/api/v1/auth"
 
 
-async def _create(client: AsyncClient, email: str, password: str = "supersecret"):
-    return await client.post(USERS, json={"email": email, "password": password})
+async def _create(
+    client: AsyncClient, email: str, password: str = "supersecret", token: str | None = None
+):
+    # POST /users is auth-protected; pass a token when BYPASS_AUTH is off.
+    headers = {"Authorization": f"Bearer {token}"} if token else None
+    return await client.post(USERS, json={"email": email, "password": password}, headers=headers)
 
 
 async def test_login_returns_bearer_token(db_client: AsyncClient) -> None:
@@ -44,7 +49,9 @@ def enforce_auth(monkeypatch: pytest.MonkeyPatch):
 
 
 async def test_me_returns_current_user(db_client: AsyncClient, enforce_auth: None) -> None:
-    created = (await _create(db_client, "me@example.com")).json()
+    created = (
+        await _create(db_client, "me@example.com", token=create_access_token("bootstrap"))
+    ).json()
     token = (
         await db_client.post(
             f"{AUTH}/login", json={"email": "me@example.com", "password": "supersecret"}

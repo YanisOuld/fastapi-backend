@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import asyncpg
 import pytest_asyncio
-from backend.app.api.dependancies import get_db
+from backend.app.api.dependencies import get_db
 from backend.app.core.config import settings
 from backend.app.core.redis import get_redis
 from backend.app.main import app
